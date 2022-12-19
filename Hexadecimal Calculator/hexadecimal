@@ -1,0 +1,124 @@
+`default_nettype none
+// Empty top module
+
+module top (
+  // I/O ports
+  input  logic hz100, reset,
+  input  logic [20:0] pb,
+  output logic [7:0] left, right,
+         ss7, ss6, ss5, ss4, ss3, ss2, ss1, ss0,
+  output logic red, green, blue,
+
+  // UART ports
+  output logic [7:0] txdata,
+  input  logic [7:0] rxdata,
+  output logic txclk, rxclk,
+  input  logic txready, rxready
+);
+
+  // Logic Variables
+  logic [31:0] entry;        // value being entered
+  logic [31:0] saved;        // saved value to use as a second operand
+  logic [4:0] op;            // the selected operation
+  logic displaysaved;        // display entry or saved?
+  logic equalpressed;        // has equal been pressed?  
+  logic [4:0] key;           // outkey of synckey module  
+  logic pressed;             // strobe of synckey module
+  logic [31:0] nextresult;   // stores the result of an arithmetic operation.
+  
+  // Step 1
+  logic [31:0] num;
+  assign num = (displaysaved == 1) ? saved : entry; 
+  synckey sc (.clk(hz100), .rst(reset), .in(pb[19:0]), .strobe(pressed), .out(key));
+  
+  // Step 2
+  assign nextresult = (op == 0) ? entry : (op == 19) ? (saved + entry) : (op == 18) ? (saved - entry) : 0;
+  
+  always_ff @ (posedge pressed, posedge reset) begin
+    if (reset == 1'b1) begin
+      entry <= 0; saved <= 0; op <= 0;       
+      displaysaved <= 0; equalpressed <= 0;   
+    end
+    else if ((key == 17) && (displaysaved == 0))
+      entry <= (entry >> 4);
+    else if (key == 16) begin
+      saved <= nextresult; displaysaved <= 1; equalpressed <= 1;
+    end
+    else if (key[4] == 1'b0) begin
+      if (entry[31:28] == 0) begin
+        entry <= (entry << 4) | {28'b0,key[3:0]};
+      end  
+      displaysaved <= 0;
+    end
+    else if (key[4:1] == 4'b1001)begin
+      if (equalpressed == 0) begin
+        saved <= nextresult;
+      end
+      op <= key;
+      displaysaved <= 1;
+      entry <= 0;
+      equalpressed <= 0;
+    end
+  end
+  
+  ssdec inst_1 (.in(num[3:0]),   .en(1'b1), .out(ss0));
+  ssdec inst_2 (.in(num[7:4]),   .en(1'b1), .out(ss1));
+  ssdec inst_3 (.in(num[11:8]),  .en(1'b1), .out(ss2));
+  ssdec inst_4 (.in(num[15:12]), .en(1'b1), .out(ss3));
+  ssdec inst_5 (.in(num[19:16]), .en(1'b1), .out(ss4));
+  ssdec inst_6 (.in(num[23:20]), .en(1'b1), .out(ss5));
+  ssdec inst_7 (.in(num[27:24]), .en(1'b1), .out(ss6));
+  ssdec inst_8 (.in(num[31:28]), .en(1'b1), .out(ss7));
+  
+endmodule
+
+// Add more modules down here
+module synckey (
+input logic clk, rst, input logic [19:0] in, 
+output logic strobe, output logic [4:0] out);
+
+  // Two-Flip-Flop Synchronizer
+  logic keyclk;
+  assign keyclk = | in;
+  logic [1:0] delay;
+  always_ff @ (posedge clk, posedge rst) begin
+    if(rst == 1'b1)
+      delay <= 0;
+    else
+    delay <= (delay << 1) | {1'b0,keyclk};
+  end
+  assign out[0] = (in[1] | in[3] | in[5] | in[7] | in[9] | in[11] | in[13] | in[15] | in[17] | in[19]); 
+  assign out[1] = (in[2] | in[3] | in[6] | in[7] | in[10] | in[11] | in[14] | in[15] | in[18] | in[19]);
+  assign out[2] = (in[4] | in[5] | in[6] | in[7] | in[12] | in[13] | in[14] | in[15] );
+  assign out[3] = (in[8] | in[9] | in[10] | in[11] | in[12] | in[13] | in[14] | in[15]);
+  assign out[4] = (in[16] | in[17] | in[18] | in[19]);
+  assign strobe = delay[1];
+    
+endmodule
+
+module ssdec (
+  input logic [3:0] in, 
+  input logic en, 
+  output logic [7:0] out
+);
+
+  logic w,x,y,z;
+  
+  assign w = in[3];
+  assign x = in[2];
+  assign y = in[1];
+  assign z = in[0];
+
+  logic a,b,c,d,e,f,g;
+  assign out[6:0] = {g,f,e,d,c,b,a}; // connect A-G to ss0
+  assign out[7] = 0;
+  // Your segment decode statements go below.
+  assign a = en & (~w & ~x & ~y & ~z) | (~w & ~x & y & ~z) | (~w & ~x & y & z) | (~w & x & ~y & z) | (~w & x & y & ~z) | (~w & x & y & z) | (w & ~x & ~y & ~z) | (w & ~x & ~y & z) | (w & ~x & y & ~z) | (w & x & ~y & ~z) | (w & x & y & ~z) | (w & x & y & z);
+  assign b = en & (~w & ~x & ~y & ~z) | (~w & ~x & ~y & z) | (~w & ~x & y & ~z) | (~w & ~x & y & z) | (~w & x & ~y & ~z) | (~w & x & y & z) | (w & ~x & ~y & ~z) | (w & ~x & ~y & z) | (w & ~x & y & ~z) | (w & x & ~y & z);
+  assign c = en & (~w & ~x & ~y & ~z) | (~w & ~x & ~y & z) | (~w & ~x & y & z) | (~w & x & ~y & ~z) | (~w & x & ~y & z) | (~w & x & y & ~z) | (~w & x & y & z) | (w & ~x & ~y & ~z) | (w & ~x & ~y & z) | (w & ~x & y & ~z) | (w & ~x & y & z) | (w & x & ~y & z);
+  assign d = en & (~w & ~x & ~y & ~z) | (~w & ~x & y & ~z) | (~w & ~x & y & z) | (~w & x & ~y & z) | (~w & x & y & ~z) | (w & ~x & ~y & ~z) | (w & ~x & y & z) | (w & x & ~y & ~z) | (w & x & ~y & z) | (w & x & y & ~z);
+  assign e = en & (~w & ~x & ~y & ~z) | (~w & ~x & y & ~z) | (~w & x & y & ~z) | (w & ~x & ~y & ~z) | (w & ~x & y & z) | (w & x & ~y & ~z) | (w & x & ~y & z) | (w & x & y & ~z) | (w & x & y & z) | (w & ~x & y & ~z); 
+  assign f = en & (~w & ~x & ~y & ~z) | (~w & x & ~y & ~z) | (~w & x & ~y & z) | (~w & x & y & ~z) | (w & ~x & ~y & ~z) | (w & ~x & ~y & z) | (w & ~x & y & ~z) | (w & x & ~y & ~z) | (w & x & y & ~z) | (w & x & y & z) | (w & ~x & y & z);
+  assign g = en & (~w & ~x & y & ~z) | (~w & ~x & y & z) | (~w & x & ~y & ~z) | (~w & x & ~y & z) | (~w & x & y & ~z) | (w & ~x & ~y & ~z) | (w & ~x & ~y & z) | (w & ~x & y & ~z) | (w & ~x & y & z) | (w & x & ~y & z) | (w & x & y & ~z) | (w & x & y & z); 
+
+endmodule
