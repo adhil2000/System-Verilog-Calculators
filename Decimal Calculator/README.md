@@ -1,4 +1,5 @@
-![image](https://user-images.githubusercontent.com/55320801/208474556-719549c1-de86-4390-9c19-c6bdffc59cee.png)
+![lab11](https://user-images.githubusercontent.com/55320801/208474684-1f8db4f8-a110-4c7f-94aa-5ba9a98ceac6.gif)
+
 
 This will be a two-part design lab, in which you will implement a hexadecimal calculator for the first part, and modify it to build a BCD calculator for the second one. A hexadecimal calculator (within the scope of ECE 270) is a device that can add and subtract two numbers (which can be of the form 0-F) resulting in a number that can also be displayed in hex. A BCD calculator, on the other hand, functions like a regular calculator in that it will make calculations only using the digits 0-9.
 
